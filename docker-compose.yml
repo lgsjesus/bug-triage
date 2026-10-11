@@ -1,0 +1,53 @@
+services:
+  litellm-proxy:
+    image: ghcr.io/berriai/litellm:main-stable
+    container_name: litellm-proxy
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm/config.yaml:/app/config.yaml
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--detailed_debug"]
+    healthcheck:
+      # Usa python (já presente na imagem) pois curl pode não existir
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  triage-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    container_name: triage-api
+    ports:
+      - "8000:8000"
+    environment:
+      - LITELLM_BASE_URL=http://litellm-proxy:4000
+      - LITELLM_API_KEY=${LITELLM_MASTER_KEY}
+    depends_on:
+      litellm-proxy:
+        condition: service_healthy
+    volumes:
+      - .:/app
+
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    container_name: test-runner
+    environment:
+      - LITELLM_BASE_URL=http://litellm-proxy:4000
+      - LITELLM_API_KEY=${LITELLM_MASTER_KEY}
+      - RUN_INTEGRATION=${RUN_INTEGRATION:-0}
+    depends_on:
+      litellm-proxy:
+        condition: service_healthy
+    command: ["pytest", "-v", "tests/"]
+    profiles:
+      - test

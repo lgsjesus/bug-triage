@@ -1,0 +1,42 @@
+model_list:
+  # --- TIER 1: Bugs Leves (UI, Typos, CSS) ---
+  - model_name: tier-low
+    litellm_params:
+      model: gemini/gemini-2.5-flash-lite
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: tier-low-backup
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+  # --- TIER 2: Bugs Médios (Lógica de Negócio, Endpoints) ---
+  - model_name: tier-medium
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: tier-medium-backup
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+  # --- TIER 3: Bugs Críticos (Deadlocks, Memory Leak, Kernel) ---
+  - model_name: tier-high
+    litellm_params:
+      model: gemini/gemini-3.8-flash
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: tier-high-backup
+    litellm_params:
+      model: openai/o3-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+router_settings:
+  routing_strategy: usage-based-routing
+  num_retries: 2
+  timeout: 20
+  fallbacks:
+    - tier-low: ["tier-low-backup", "tier-medium"]
+    - tier-medium: ["tier-medium-backup", "tier-low"]
+    - tier-high: ["tier-high-backup", "tier-medium"]
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
